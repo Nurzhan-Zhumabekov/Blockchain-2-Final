@@ -1,0 +1,8 @@
+{
+  "filter_paths": "lib/",
+  "exclude_dependencies": true,
+  "solc_remaps": [],
+  "detectors_to_exclude": "naming-convention",
+  "checklist": true,
+  "json": "slither-report.json"
+}

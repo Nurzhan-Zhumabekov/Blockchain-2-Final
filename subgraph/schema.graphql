@@ -1,0 +1,187 @@
+# ─── RWA Platform — The Graph Schema ────────────────────────────────────────
+# Indexes events from: RWAFactory, RWAToken, RWAVault, RWAPool,
+#                      AssetCertificate, RWAStaking, RWAGovernor
+
+# ── Asset ─────────────────────────────────────────────────────────────────────
+
+type Asset @entity {
+  id:              Bytes!          # keccak256 salt (bytes32)
+  tokenProxy:      Bytes!
+  vaultProxy:      Bytes!
+  issuer:          Bytes!
+  assetType:       String!
+  certificateId:   BigInt!
+  deployedAt:      BigInt!
+  token:           Token!
+  vault:           Vault!
+}
+
+type Certificate @entity {
+  id:              BigInt!         # ERC-721 tokenId
+  rwaToken:        Bytes!
+  assetType:       String!
+  issuedAt:        BigInt!
+  owner:           Bytes!
+}
+
+# ── Token ─────────────────────────────────────────────────────────────────────
+
+type Token @entity {
+  id:              Bytes!          # proxy address
+  name:            String!
+  symbol:          String!
+  assetType:       String!
+  totalSupply:     BigDecimal!
+  totalCollateral: BigDecimal!
+  priceFeed:       Bytes!
+  issues:          [IssueEvent!]!  @derivedFrom(field: "token")
+  redeems:         [RedeemEvent!]! @derivedFrom(field: "token")
+  asset:           Asset
+}
+
+type IssueEvent @entity(immutable: true) {
+  id:              Bytes!
+  token:           Token!
+  issuer:          Bytes!
+  to:              Bytes!
+  amount:          BigDecimal!
+  blockNumber:     BigInt!
+  timestamp:       BigInt!
+  txHash:          Bytes!
+}
+
+type RedeemEvent @entity(immutable: true) {
+  id:              Bytes!
+  token:           Token!
+  from:            Bytes!
+  amount:          BigDecimal!
+  blockNumber:     BigInt!
+  timestamp:       BigInt!
+  txHash:          Bytes!
+}
+
+# ── Vault ─────────────────────────────────────────────────────────────────────
+
+type Vault @entity {
+  id:              Bytes!          # proxy address
+  totalYieldAccrued: BigDecimal!
+  yieldDeposits:   [YieldDeposit!]! @derivedFrom(field: "vault")
+  asset:           Asset
+}
+
+type YieldDeposit @entity(immutable: true) {
+  id:              Bytes!
+  vault:           Vault!
+  source:          Bytes!
+  amount:          BigDecimal!
+  blockNumber:     BigInt!
+  timestamp:       BigInt!
+  txHash:          Bytes!
+}
+
+# ── Pool / AMM ────────────────────────────────────────────────────────────────
+
+type Pool @entity {
+  id:              Bytes!          # pool contract address
+  token0:          Bytes!
+  token1:          Bytes!
+  reserve0:        BigDecimal!
+  reserve1:        BigDecimal!
+  totalLPSupply:   BigDecimal!
+  swaps:           [Swap!]!        @derivedFrom(field: "pool")
+  liquidityEvents: [LiquidityEvent!]! @derivedFrom(field: "pool")
+}
+
+type Swap @entity(immutable: true) {
+  id:              Bytes!
+  pool:            Pool!
+  trader:          Bytes!
+  tokenIn:         Bytes!
+  amountIn:        BigDecimal!
+  amountOut:       BigDecimal!
+  blockNumber:     BigInt!
+  timestamp:       BigInt!
+  txHash:          Bytes!
+}
+
+type LiquidityEvent @entity(immutable: true) {
+  id:              Bytes!
+  pool:            Pool!
+  provider:        Bytes!
+  type:            String!         # "ADD" | "REMOVE"
+  amount0:         BigDecimal!
+  amount1:         BigDecimal!
+  shares:          BigDecimal!
+  blockNumber:     BigInt!
+  timestamp:       BigInt!
+  txHash:          Bytes!
+}
+
+# ── Staking ──────────────────────────────────────────────────────────────────
+
+type StakingPool @entity {
+  id:              Bytes!          # staking contract address
+  totalStaked:     BigDecimal!
+  rewardRate:      BigDecimal!
+  periodFinish:    BigInt!
+  positions:       [StakingPosition!]! @derivedFrom(field: "pool")
+}
+
+type StakingPosition @entity {
+  id:              Bytes!          # pool addr + staker addr
+  pool:            StakingPool!
+  staker:          Bytes!
+  stakedAmount:    BigDecimal!
+  rewardsClaimed:  BigDecimal!
+  lastUpdated:     BigInt!
+}
+
+type StakeEvent @entity(immutable: true) {
+  id:              Bytes!
+  pool:            StakingPool!
+  user:            Bytes!
+  amount:          BigDecimal!
+  type:            String!         # "STAKE" | "WITHDRAW" | "CLAIM"
+  blockNumber:     BigInt!
+  timestamp:       BigInt!
+  txHash:          Bytes!
+}
+
+# ── Governance ───────────────────────────────────────────────────────────────
+
+type GovernanceProposal @entity {
+  id:              BigInt!         # proposalId
+  proposer:        Bytes!
+  description:     String!
+  state:           String!         # "Pending" | "Active" | "Succeeded" | "Defeated" | "Queued" | "Executed" | "Canceled"
+  forVotes:        BigDecimal!
+  againstVotes:    BigDecimal!
+  abstainVotes:    BigDecimal!
+  startBlock:      BigInt!
+  endBlock:        BigInt!
+  createdAt:       BigInt!
+  executedAt:      BigInt
+  votes:           [Vote!]!        @derivedFrom(field: "proposal")
+}
+
+type Vote @entity(immutable: true) {
+  id:              Bytes!
+  proposal:        GovernanceProposal!
+  voter:           Bytes!
+  support:         Int!            # 0=Against 1=For 2=Abstain
+  weight:          BigDecimal!
+  blockNumber:     BigInt!
+  timestamp:       BigInt!
+  txHash:          Bytes!
+}
+
+# ── Global stats ─────────────────────────────────────────────────────────────
+
+type Protocol @entity {
+  id:              ID!             # "rwa-platform"
+  totalAssets:     Int!
+  totalIssued:     BigDecimal!
+  totalRedeemed:   BigDecimal!
+  totalSwapVolume: BigDecimal!
+  totalYield:      BigDecimal!
+}

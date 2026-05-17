@@ -1,0 +1,15 @@
+{
+  "name": "@rwa-platform/subgraph",
+  "version": "1.0.0",
+  "description": "The Graph subgraph for the RWA Tokenization Platform",
+  "scripts": {
+    "codegen":  "graph codegen",
+    "build":    "graph build",
+    "deploy":   "graph deploy rwa-platform",
+    "deploy:studio": "graph deploy --studio rwa-platform"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli":  "^0.81.0",
+    "@graphprotocol/graph-ts":   "^0.35.1"
+  }
+}
