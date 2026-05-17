@@ -12,9 +12,9 @@ export function StakePanel() {
 
   const { data, refetch } = useReadContracts({
     contracts: [
-      { address: ADDRESSES.rwaStaking, abi: RWA_STAKING_ABI, functionName: 'staked', args: [address ?? '0x0'] },
+      { address: ADDRESSES.rwaStaking, abi: RWA_STAKING_ABI, functionName: 'balanceOf', args: [address ?? '0x0'] },
       { address: ADDRESSES.rwaStaking, abi: RWA_STAKING_ABI, functionName: 'earned', args: [address ?? '0x0'] },
-      { address: ADDRESSES.rwaStaking, abi: RWA_STAKING_ABI, functionName: 'totalStaked' },
+      { address: ADDRESSES.rwaStaking, abi: RWA_STAKING_ABI, functionName: 'totalSupply' },
       { address: ADDRESSES.rwaStaking, abi: RWA_STAKING_ABI, functionName: 'rewardRate' },
       {
         address: ADDRESSES.govToken, abi: ERC20_ABI, functionName: 'balanceOf',
@@ -25,12 +25,12 @@ export function StakePanel() {
         args: [address ?? '0x0', ADDRESSES.rwaStaking],
       },
     ],
-    query: { enabled: isConnected && deployed },
+    query: { enabled: deployed },
   })
 
-  const userStaked  = data?.[0]?.result as bigint | undefined
+  const userStaked  = data?.[0]?.result as bigint | undefined  // balanceOf on staking contract
   const earned      = data?.[1]?.result as bigint | undefined
-  const totalStaked = data?.[2]?.result as bigint | undefined
+  const totalStaked = data?.[2]?.result as bigint | undefined  // totalSupply on staking contract
   const rewardRate  = data?.[3]?.result as bigint | undefined
   const govBalance  = data?.[4]?.result as bigint | undefined
   const allowance   = data?.[5]?.result as bigint | undefined

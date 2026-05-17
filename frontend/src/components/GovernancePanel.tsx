@@ -30,7 +30,7 @@ export function GovernancePanel() {
       { address: ADDRESSES.govToken,    abi: GOV_TOKEN_ABI,    functionName: 'delegates', args: [address ?? '0x0'] },
       { address: ADDRESSES.govToken,    abi: GOV_TOKEN_ABI,    functionName: 'balanceOf', args: [address ?? '0x0'] },
     ],
-    query: { enabled: isConnected && deployed },
+    query: { enabled: deployed },
   })
 
   const votingDelay  = data?.[0]?.result as bigint | undefined

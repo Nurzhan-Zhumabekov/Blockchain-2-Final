@@ -30,7 +30,7 @@ export function Overview() {
       { address: ADDRESSES.rwaPool,  abi: RWA_POOL_ABI,  functionName: 'totalSupply' },
       { address: ADDRESSES.rwaPool,  abi: RWA_POOL_ABI,  functionName: 'balanceOf', args: [address ?? '0x0'] },
     ],
-    query: { enabled: isConnected && deployed },
+    query: { enabled: deployed },
   })
 
   const [

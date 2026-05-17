@@ -26,7 +26,7 @@ export function SwapPanel() {
         args: [address ?? '0x0'],
       },
     ],
-    query: { enabled: isConnected && deployed },
+    query: { enabled: deployed },
   })
 
   const reserve0 = data?.[0]?.result as bigint | undefined

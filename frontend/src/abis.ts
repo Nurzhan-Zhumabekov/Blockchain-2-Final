@@ -184,11 +184,11 @@ export const RWA_STAKING_ABI = [
     inputs: [], outputs: [{ type: 'uint256' }], stateMutability: 'view',
   },
   {
-    type: 'function', name: 'totalStaked',
+    type: 'function', name: 'totalSupply',
     inputs: [], outputs: [{ type: 'uint256' }], stateMutability: 'view',
   },
   {
-    type: 'function', name: 'staked',
+    type: 'function', name: 'balanceOf',
     inputs: [{ name: 'account', type: 'address' }],
     outputs: [{ type: 'uint256' }], stateMutability: 'view',
   },
