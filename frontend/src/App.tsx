@@ -3,14 +3,16 @@ import { Header } from './components/Header'
 import { Overview } from './components/Overview'
 import { SwapPanel } from './components/SwapPanel'
 import { StakePanel } from './components/StakePanel'
+import { VaultPanel } from './components/VaultPanel'
 import { GovernancePanel } from './components/GovernancePanel'
 
-type Tab = 'overview' | 'swap' | 'stake' | 'governance'
+type Tab = 'overview' | 'swap' | 'stake' | 'vault' | 'governance'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview',    label: 'Overview' },
   { id: 'swap',        label: 'Swap' },
   { id: 'stake',       label: 'Stake' },
+  { id: 'vault',       label: 'Vault' },
   { id: 'governance',  label: 'Governance' },
 ]
 
@@ -37,6 +39,7 @@ export default function App() {
         {tab === 'overview'   && <Overview />}
         {tab === 'swap'       && <SwapPanel />}
         {tab === 'stake'      && <StakePanel />}
+        {tab === 'vault'      && <VaultPanel />}
         {tab === 'governance' && <GovernancePanel />}
       </main>
 

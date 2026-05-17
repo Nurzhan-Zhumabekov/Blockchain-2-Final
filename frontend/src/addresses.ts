@@ -6,6 +6,7 @@
 //   VITE_RWA_STAKING=0x...
 //   VITE_RWA_GOVERNOR=0x...
 //   VITE_TIMELOCK=0x...
+//   VITE_RWA_VAULT=0x...
 
 function addr(key: string): `0x${string}` {
   const v = import.meta.env[key]
@@ -20,6 +21,7 @@ export const ADDRESSES = {
   rwaStaking:  addr('VITE_RWA_STAKING'),
   rwaGovernor: addr('VITE_RWA_GOVERNOR'),
   timelock:    addr('VITE_TIMELOCK'),
+  rwaVault:    addr('VITE_RWA_VAULT'),
 } as const
 
 export const ZERO_ADDR = '0x0000000000000000000000000000000000000000' as const
