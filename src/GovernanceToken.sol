@@ -9,7 +9,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {UUPSUpgradeable}          from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {NoncesUpgradeable}        from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
 
-contract GameToken is
+contract GovernanceToken is
     Initializable,
     ERC20Upgradeable,
     ERC20PermitUpgradeable,
@@ -20,7 +20,7 @@ contract GameToken is
     bytes32 public constant MINTER_ROLE   = keccak256("MINTER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    uint256 public constant MAX_SUPPLY = 1_000_000_000 ether;
+    uint256 public constant MAX_SUPPLY = 100_000_000 ether;
 
     error ZeroAddress();
     error ZeroAmount();
@@ -37,8 +37,8 @@ contract GameToken is
     function initialize(address admin) external initializer {
         if (admin == address(0)) revert ZeroAddress();
 
-        __ERC20_init("GameToken", "GAME");
-        __ERC20Permit_init("GameToken");
+        __ERC20_init("RWA Governance Token", "RWAGOV");
+        __ERC20Permit_init("RWA Governance Token");
         __ERC20Votes_init();
         __AccessControl_init();
 
@@ -88,7 +88,7 @@ contract GameToken is
         return super.nonces(owner);
     }
 
-    function _authorizeUpgrade(address newImplementation)
+    function _authorizeUpgrade(address)
         internal
         override
         onlyRole(UPGRADER_ROLE)

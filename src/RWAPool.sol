@@ -9,20 +9,21 @@ import {Pausable}        from "@openzeppelin/contracts/utils/Pausable.sol";
 import {AccessControl}   from "@openzeppelin/contracts/access/AccessControl.sol";
 import {AggregatorV3Interface} from "./interfaces/AggregatorV3Interface.sol";
 
-// Constant-product AMM (x * y = k) based on Lecture 4 patterns.
-// tokenA = GAME, tokenB = MINE. LP token: GRLP.
-contract ResourceAMM is ERC20, ReentrancyGuard, Pausable, AccessControl {
+// Constant-product AMM (x * y = k) for RWAGOV ↔ RWAToken liquidity.
+// 0.3% fee; LP shares minted as RWAP ERC-20; slippage protection on every swap.
+// getAmountOut() implemented in Yul — benchmarked against getAmountOutSolidity().
+contract RWAPool is ERC20, ReentrancyGuard, Pausable, AccessControl {
     using SafeERC20 for IERC20;
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-    IERC20                public immutable token0;   // GAME token
-    IERC20                public immutable token1;   // MINE token
+    IERC20                public immutable token0;   // RWAGOV
+    IERC20                public immutable token1;   // RWAToken
     AggregatorV3Interface public immutable priceFeed;
 
-    uint256 public constant FEE_NUMERATOR       = 3;      // 0.3% fee (Lecture 4)
-    uint256 public constant FEE_DENOMINATOR     = 1000;
-    uint256 public constant MINIMUM_LIQUIDITY   = 1000;   // permanently locked (Lecture 4)
+    uint256 public constant FEE_NUMERATOR     = 3;
+    uint256 public constant FEE_DENOMINATOR   = 1000;
+    uint256 public constant MINIMUM_LIQUIDITY = 1000;
     uint256 public constant STALENESS_THRESHOLD = 1 hours;
 
     uint256 public reserve0;
@@ -45,7 +46,7 @@ contract ResourceAMM is ERC20, ReentrancyGuard, Pausable, AccessControl {
         address _token1,
         address _priceFeed,
         address admin
-    ) ERC20("GameResource-LP", "GRLP") {
+    ) ERC20("RWA-Pool LP", "RWAP") {
         if (_token0 == address(0) || _token1 == address(0) || admin == address(0)) revert ZeroAddress();
         token0    = IERC20(_token0);
         token1    = IERC20(_token1);
@@ -54,7 +55,6 @@ contract ResourceAMM is ERC20, ReentrancyGuard, Pausable, AccessControl {
         _grantRole(PAUSER_ROLE,        admin);
     }
 
-    // Lecture 4, slide 30: addLiquidity with optimal-amount matching
     function addLiquidity(
         uint256 amount0Desired,
         uint256 amount1Desired,
@@ -68,11 +68,9 @@ contract ResourceAMM is ERC20, ReentrancyGuard, Pausable, AccessControl {
         uint256 amount1;
 
         if (reserve0 == 0 && reserve1 == 0) {
-            // First deposit: LP sets the initial price
             amount0 = amount0Desired;
             amount1 = amount1Desired;
         } else {
-            // Calculate optimal amounts to match current ratio
             uint256 amount1Optimal = (amount0Desired * reserve1) / reserve0;
             if (amount1Optimal <= amount1Desired) {
                 if (amount1Optimal < amount1Min) revert SlippageExceeded(amount1Optimal, amount1Min);
@@ -88,14 +86,12 @@ contract ResourceAMM is ERC20, ReentrancyGuard, Pausable, AccessControl {
 
         uint256 supply = totalSupply();
         if (supply == 0) {
-            // Lecture 4, slide 15: liquidity = sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY
             liquidity = _sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY;
-            _mint(address(1), MINIMUM_LIQUIDITY); // lock minimum forever
+            _mint(address(1), MINIMUM_LIQUIDITY);
         } else {
-            // Lecture 4, slide 15: liquidity = min(amount0/reserve0, amount1/reserve1) * totalSupply
             uint256 s0 = (amount0 * supply) / reserve0;
             uint256 s1 = (amount1 * supply) / reserve1;
-            liquidity = s0 < s1 ? s0 : s1;
+            liquidity  = s0 < s1 ? s0 : s1;
         }
 
         if (liquidity == 0) revert InsufficientLiquidity();
@@ -132,7 +128,6 @@ contract ResourceAMM is ERC20, ReentrancyGuard, Pausable, AccessControl {
         emit LiquidityRemoved(msg.sender, amount0, amount1, shares);
     }
 
-    // Lecture 4, slide 31: single swap function with tokenIn routing
     function swap(
         address tokenIn,
         uint256 amountIn,
@@ -150,32 +145,24 @@ contract ResourceAMM is ERC20, ReentrancyGuard, Pausable, AccessControl {
 
         inputToken.safeTransferFrom(msg.sender, address(this), amountIn);
 
-        // Constant-product formula with 0.3% fee (Yul, benchmarked vs getAmountOutSolidity)
         amountOut = getAmountOut(amountIn, resIn, resOut);
-        if (amountOut == 0)           revert InsufficientOutputAmount();
-        if (amountOut < amountOutMin) revert SlippageExceeded(amountOut, amountOutMin);
+        if (amountOut == 0)            revert InsufficientOutputAmount();
+        if (amountOut < amountOutMin)  revert SlippageExceeded(amountOut, amountOutMin);
 
         outputToken.safeTransfer(msg.sender, amountOut);
 
-        if (isToken0) {
-            reserve0 += amountIn;
-            reserve1 -= amountOut;
-        } else {
-            reserve1 += amountIn;
-            reserve0 -= amountOut;
-        }
+        if (isToken0) { reserve0 += amountIn; reserve1 -= amountOut; }
+        else          { reserve1 += amountIn; reserve0 -= amountOut; }
 
         emit Swap(msg.sender, tokenIn, amountIn, amountOut);
     }
 
-    // Yul implementation — benchmarked against getAmountOutSolidity below
+    // Yul implementation — benchmarked against getAmountOutSolidity below.
     function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut)
         public pure returns (uint256 amountOut)
     {
         if (reserveIn == 0 || reserveOut == 0) revert InsufficientLiquidity();
         assembly ("memory-safe") {
-            // amountInWithFee = amountIn * (FEE_DENOMINATOR - FEE_NUMERATOR)
-            //                 = amountIn * 997
             let amountInWithFee := mul(amountIn, 997)
             let numerator       := mul(amountInWithFee, reserveOut)
             let denominator     := add(mul(reserveIn, 1000), amountInWithFee)
@@ -183,7 +170,7 @@ contract ResourceAMM is ERC20, ReentrancyGuard, Pausable, AccessControl {
         }
     }
 
-    // Pure-Solidity equivalent — used in benchmarks to compare gas vs Yul version
+    // Pure-Solidity equivalent — used in gas benchmarks to quantify Yul savings.
     function getAmountOutSolidity(uint256 amountIn, uint256 reserveIn, uint256 reserveOut)
         public pure returns (uint256)
     {
@@ -198,7 +185,7 @@ contract ResourceAMM is ERC20, ReentrancyGuard, Pausable, AccessControl {
         if (block.timestamp - updatedAt > STALENESS_THRESHOLD) revert StalePrice(updatedAt);
     }
 
-    // Babylonian square root in Yul — used for initial LP minting (Lecture 4, slide 15)
+    // Babylonian square root in Yul — for initial LP minting.
     function _sqrt(uint256 y) internal pure returns (uint256 z) {
         assembly ("memory-safe") {
             switch gt(y, 3)

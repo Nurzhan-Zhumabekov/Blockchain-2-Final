@@ -3,3 +3,8 @@ cache/
 .env
 broadcast/
 lib/
+subgraph/node_modules/
+subgraph/generated/
+subgraph/build/
+lcov.info
+*.gas-snapshot

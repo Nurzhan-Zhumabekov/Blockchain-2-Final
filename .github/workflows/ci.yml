@@ -1,0 +1,184 @@
+name: RWA Platform CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  FOUNDRY_PROFILE: default
+
+jobs:
+  # ── 1. Build ────────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Build contracts
+        run: forge build --sizes
+
+      - name: Check contract sizes
+        run: forge build --sizes 2>&1 | tee sizes.txt
+
+  # ── 2. Lint ─────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run forge fmt check
+        run: forge fmt --check
+
+  # ── 3. Unit & Fuzz Tests ────────────────────────────────────────────────────
+  test:
+    name: Unit & Fuzz Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run tests (exclude fork)
+        run: forge test --no-match-contract "ForkTest" -vvv
+
+  # ── 4. Invariant Tests ──────────────────────────────────────────────────────
+  invariant:
+    name: Invariant Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run invariant tests
+        run: forge test --match-contract "Invariant" -vvv
+
+  # ── 5. Coverage ─────────────────────────────────────────────────────────────
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Generate coverage report
+        run: |
+          forge coverage \
+            --no-match-contract "ForkTest" \
+            --report lcov \
+            --report summary
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./lcov.info
+          flags: forge
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  # ── 6. Fork Tests (Arbitrum Sepolia) ────────────────────────────────────────
+  fork-test:
+    name: Fork Tests (Arbitrum Sepolia)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run fork tests
+        env:
+          ARBITRUM_SEPOLIA_RPC_URL: ${{ secrets.ARBITRUM_SEPOLIA_RPC_URL }}
+        run: |
+          forge test --match-contract "ForkTest" \
+            --fork-url $ARBITRUM_SEPOLIA_RPC_URL \
+            -vvv
+
+  # ── 7. Slither Static Analysis ───────────────────────────────────────────────
+  slither:
+    name: Slither Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Run Slither
+        uses: crytic/slither-action@v0.4.0
+        continue-on-error: true
+        with:
+          target: src/
+          slither-args: >
+            --exclude-dependencies
+            --filter-paths "lib/"
+            --checklist
+
+  # ── 8. Deploy to Arbitrum Sepolia (on merge to main) ─────────────────────────
+  deploy-arbitrum-sepolia:
+    name: Deploy to Arbitrum Sepolia
+    runs-on: ubuntu-latest
+    needs: [build, test, invariant]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: arbitrum-sepolia
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Deploy contracts
+        env:
+          DEPLOYER_PRIVATE_KEY:       ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          ARBITRUM_SEPOLIA_RPC_URL:   ${{ secrets.ARBITRUM_SEPOLIA_RPC_URL }}
+          ARBISCAN_API_KEY:           ${{ secrets.ARBISCAN_API_KEY }}
+          PRICE_FEED_ADDRESS:         ${{ vars.PRICE_FEED_ADDRESS }}
+        run: |
+          forge script script/Deploy.s.sol:Deploy \
+            --rpc-url $ARBITRUM_SEPOLIA_RPC_URL \
+            --broadcast \
+            --verify \
+            --delay 5 \
+            -vvvv

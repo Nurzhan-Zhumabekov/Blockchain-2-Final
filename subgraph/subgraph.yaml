@@ -1,0 +1,169 @@
+specVersion: 1.0.0
+indexerHints:
+  prune: auto
+
+schema:
+  file: ./schema.graphql
+
+dataSources:
+  # ── RWAFactory ────────────────────────────────────────────────────────────
+  - kind: ethereum
+    name: RWAFactory
+    network: arbitrum-sepolia
+    source:
+      address: "0x0000000000000000000000000000000000000000"   # replace after deploy
+      abi: RWAFactory
+      startBlock: 0                                           # replace after deploy
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Asset
+        - Token
+        - Vault
+        - Protocol
+      abis:
+        - name: RWAFactory
+          file: ../out/RWAFactory.sol/RWAFactory.json
+        - name: RWAToken
+          file: ../out/RWAToken.sol/RWAToken.json
+      eventHandlers:
+        - event: AssetOnboarded(indexed bytes32,indexed address,indexed address,address,uint256)
+          handler: handleAssetOnboarded
+      file: ./src/rwa-platform.ts
+
+  # ── RWAPool ───────────────────────────────────────────────────────────────
+  - kind: ethereum
+    name: RWAPool
+    network: arbitrum-sepolia
+    source:
+      address: "0x0000000000000000000000000000000000000000"   # replace after deploy
+      abi: RWAPool
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Pool
+        - Swap
+        - LiquidityEvent
+        - Protocol
+      abis:
+        - name: RWAPool
+          file: ../out/RWAPool.sol/RWAPool.json
+      eventHandlers:
+        - event: Swap(indexed address,indexed address,uint256,uint256)
+          handler: handleSwap
+        - event: LiquidityAdded(indexed address,uint256,uint256,uint256)
+          handler: handleLiquidityAdded
+        - event: LiquidityRemoved(indexed address,uint256,uint256,uint256)
+          handler: handleLiquidityRemoved
+      file: ./src/rwa-platform.ts
+
+  # ── RWAStaking ────────────────────────────────────────────────────────────
+  - kind: ethereum
+    name: RWAStaking
+    network: arbitrum-sepolia
+    source:
+      address: "0x0000000000000000000000000000000000000000"   # replace after deploy
+      abi: RWAStaking
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - StakingPool
+        - StakingPosition
+        - StakeEvent
+      abis:
+        - name: RWAStaking
+          file: ../out/RWAStaking.sol/RWAStaking.json
+      eventHandlers:
+        - event: Staked(indexed address,uint256)
+          handler: handleStaked
+        - event: Withdrawn(indexed address,uint256)
+          handler: handleWithdrawn
+        - event: RewardPaid(indexed address,uint256)
+          handler: handleRewardPaid
+        - event: RewardAdded(uint256,uint256,uint256)
+          handler: handleRewardAdded
+      file: ./src/rwa-platform.ts
+
+  # ── RWAGovernor ───────────────────────────────────────────────────────────
+  - kind: ethereum
+    name: RWAGovernor
+    network: arbitrum-sepolia
+    source:
+      address: "0x0000000000000000000000000000000000000000"   # replace after deploy
+      abi: RWAGovernor
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GovernanceProposal
+        - Vote
+      abis:
+        - name: RWAGovernor
+          file: ../out/RWAGovernor.sol/RWAGovernor.json
+      eventHandlers:
+        - event: ProposalCreated(uint256,address,address[],uint256[],string[],bytes[],uint256,uint256,string)
+          handler: handleProposalCreated
+        - event: VoteCast(indexed address,uint256,uint8,uint256,string)
+          handler: handleVoteCast
+        - event: ProposalExecuted(uint256)
+          handler: handleProposalExecuted
+        - event: ProposalCanceled(uint256)
+          handler: handleProposalCanceled
+      file: ./src/rwa-platform.ts
+
+# ── Dynamic data sources (RWAToken and RWAVault deployed by factory) ─────────
+templates:
+  - kind: ethereum
+    name: RWAToken
+    network: arbitrum-sepolia
+    source:
+      abi: RWAToken
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Token
+        - IssueEvent
+        - RedeemEvent
+        - Protocol
+      abis:
+        - name: RWAToken
+          file: ../out/RWAToken.sol/RWAToken.json
+      eventHandlers:
+        - event: Issued(indexed address,indexed address,uint256)
+          handler: handleIssued
+        - event: Redeemed(indexed address,uint256)
+          handler: handleRedeemed
+      file: ./src/rwa-platform.ts
+
+  - kind: ethereum
+    name: RWAVault
+    network: arbitrum-sepolia
+    source:
+      abi: RWAVault
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Vault
+        - YieldDeposit
+        - Protocol
+      abis:
+        - name: RWAVault
+          file: ../out/RWAVault.sol/RWAVault.json
+      eventHandlers:
+        - event: YieldDeposited(indexed address,uint256)
+          handler: handleYieldDeposited
+      file: ./src/rwa-platform.ts

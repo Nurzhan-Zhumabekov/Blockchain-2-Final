@@ -9,7 +9,10 @@ import {UUPSUpgradeable}          from "@openzeppelin/contracts-upgradeable/prox
 import {IERC20}                   from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20}                from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract ItemVault is
+// ERC-4626 tokenized vault that accepts RWAToken as the underlying asset.
+// Share-holders earn yield as the manager deposits real-world returns via depositYield().
+// Passes all ERC-4626 rounding invariants because it relies entirely on the OZ implementation.
+contract RWAVault is
     Initializable,
     ERC4626Upgradeable,
     AccessControlUpgradeable,
@@ -23,17 +26,18 @@ contract ItemVault is
     uint256 public totalYieldAccrued;
 
     error ZeroAddress();
+    error ZeroAmount();
 
     event YieldDeposited(address indexed source, uint256 amount);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
 
-    function initialize(address admin, address gameToken) external initializer {
-        if (admin == address(0) || gameToken == address(0)) revert ZeroAddress();
+    function initialize(address admin, address rwaToken) external initializer {
+        if (admin == address(0) || rwaToken == address(0)) revert ZeroAddress();
 
-        __ERC4626_init(IERC20(gameToken));
-        __ERC20_init("GameVault Shares", "gvGAME");
+        __ERC4626_init(IERC20(rwaToken));
+        __ERC20_init("RWA Vault Shares", "vRWA");
         __AccessControl_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -41,7 +45,9 @@ contract ItemVault is
         _grantRole(UPGRADER_ROLE,      admin);
     }
 
+    // Manager deposits yield from real-world asset returns; increases share value for all depositors.
     function depositYield(uint256 amount) external onlyRole(MANAGER_ROLE) {
+        if (amount == 0) revert ZeroAmount();
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
         totalYieldAccrued += amount;
         emit YieldDeposited(msg.sender, amount);
@@ -50,7 +56,9 @@ contract ItemVault is
     function _authorizeUpgrade(address) internal override onlyRole(UPGRADER_ROLE) {}
 
     function supportsInterface(bytes4 interfaceId)
-        public view override(AccessControlUpgradeable)
+        public
+        view
+        override(AccessControlUpgradeable)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
